@@ -6,7 +6,7 @@ import { Injectable } from '@nestjs/common';
 export class UserService {
   private readonly users: User[] = [];
 
-  async create(newUser: CreateUserDto): Primise<User> {
+  async create(newUser: CreateUserDto): Promise<User> {
     const user: User = {
       id: this.users.length + 1,
       passPhrase: newUser.passPhrase,
@@ -21,6 +21,19 @@ export class UserService {
   async findByPassPhrase(passPhrase: string): Promise<User | undefined> {
     return this.users.find((user) => user.passPhrase === passPhrase);
   }
+}
+
+interface User {
+  id: number;
+  passPhrase: string;
+  publicKey: string;
+  privateKey: string;
+}
+
+interface CreateUserDto {
+  passPhrase: string;
+  publicKey: string;
+  privateKey: string;
 }
 
 // describe('UserService', () => {
