@@ -13,6 +13,7 @@ export class UserService {
       passPhrase: newUser.passPhrase,
       publicKey: newUser.publicKey,
       privateKey: newUser.privateKey,
+      password: newUser.password,
     };
 
     this.users.push(user);
@@ -22,6 +23,10 @@ export class UserService {
   async findByPassPhrase(passPhrase: string): Promise<User | undefined> {
     return this.users.find((user) => user.passPhrase === passPhrase);
   }
+
+  async update(user: User): Promise<void> {
+    await db.put(user.id.toString(), user);
+  }
 }
 
 interface User {
@@ -29,10 +34,12 @@ interface User {
   passPhrase: string;
   publicKey: string;
   privateKey: string;
+  password: string;
 }
 
 interface CreateUserDto {
   passPhrase: string;
   publicKey: string;
   privateKey: string;
+  password: string;
 }

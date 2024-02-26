@@ -7,7 +7,7 @@ import { UserService } from './user.service';
 export class UserController {
   constructor(private readonly userService: UserService) {}
   @Post('register')
-  async register(): Promise<any> {
+  async register(@Body('password') password: string): Promise<any> {
     const mnemonic = bip39.generateMnemonic();
     const ec = new elliptic.ec('secp256k1');
     const keyPair = ec.genKeyPair();
@@ -18,6 +18,7 @@ export class UserController {
       passPhrase: mnemonic,
       publicKey,
       privateKey,
+      password,
     });
 
     return {
@@ -27,15 +28,26 @@ export class UserController {
   }
 
   @Post('import')
-  async import(@Body('passPhrase') passPhrase: string): Promise<any> {
+  // Import method in UserController
+  async import(
+    @Body('passPhrase') passPhrase: string,
+    @Body('password') password: string,
+  ): Promise<any> {
     const user = await this.userService.findByPassPhrase(passPhrase);
     if (!user) {
       throw new UnauthorizedException('Invalid passphrase');
     }
 
+    // Update the user's password
+    user.password = password;
+
+    // Save the updated user
+    await this.userService.update(user);
+
     return {
       publicKey: user.publicKey,
       privateKey: user.privateKey,
+      password: user.password,
     };
   }
 }
