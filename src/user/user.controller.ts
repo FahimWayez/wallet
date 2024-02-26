@@ -2,7 +2,6 @@ import { Controller, Post, Body, UnauthorizedException } from '@nestjs/common';
 import * as bip39 from 'bip39';
 import * as elliptic from 'elliptic';
 import { UserService } from './user.service';
-import { register } from 'module';
 
 @Controller('users')
 export class UserController {
