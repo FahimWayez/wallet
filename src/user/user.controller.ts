@@ -1,4 +1,11 @@
-import { Controller, Post, Body, UnauthorizedException } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  UnauthorizedException,
+  Get,
+  Req,
+} from '@nestjs/common';
 import * as bip39 from 'bip39';
 import * as elliptic from 'elliptic';
 import { UserService } from './user.service';
@@ -24,6 +31,7 @@ export class UserController {
     return {
       mnemonic,
       publicKey: user.publicKey,
+      password: user.password,
     };
   }
 
@@ -45,6 +53,20 @@ export class UserController {
       publicKey: user.publicKey,
       privateKey: user.privateKey,
       password: user.password,
+    };
+  }
+
+  @Get('privateKey')
+  async getPrivateKey(@Req() request): Promise<any> {
+    const { passPhrase, password } = request.body;
+
+    const user = await this.userService.findByPassPhrase(passPhrase);
+    if (!user || user.password !== password) {
+      throw new UnauthorizedException('Invalid passphrase or password');
+    }
+
+    return {
+      privateKey: user.privateKey,
     };
   }
 }
