@@ -1,5 +1,8 @@
 import { Injectable } from '@nestjs/common';
 
+var { Level } = require('level');
+var db = new Level('./userdb', { valueEncoding: 'json' });
+
 @Injectable()
 export class UserService {
   private readonly users: User[] = [];
