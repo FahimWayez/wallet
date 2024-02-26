@@ -28,7 +28,6 @@ export class UserController {
   }
 
   @Post('import')
-  // Import method in UserController
   async import(
     @Body('passPhrase') passPhrase: string,
     @Body('password') password: string,
@@ -38,10 +37,8 @@ export class UserController {
       throw new UnauthorizedException('Invalid passphrase');
     }
 
-    // Update the user's password
     user.password = password;
 
-    // Save the updated user
     await this.userService.update(user);
 
     return {
