@@ -9,7 +9,7 @@ import {
 import * as bip39 from 'bip39';
 import * as elliptic from 'elliptic';
 import { UserService } from './user.service';
-//
+
 @Controller('users')
 export class UserController {
   constructor(private readonly userService: UserService) {}
@@ -31,7 +31,8 @@ export class UserController {
     return {
       mnemonic,
       publicKey: user.publicKey,
-      password: user.password,
+      password: user.password, //shoraite hobe
+      privateKey: user.privateKey, //shoraite hobe
     };
   }
 
@@ -51,8 +52,8 @@ export class UserController {
 
     return {
       publicKey: user.publicKey,
-      privateKey: user.privateKey,
-      password: user.password,
+      privateKey: user.privateKey, //shoraite hobe
+      password: user.password, //shoraite hobe
     };
   }
 
@@ -67,6 +68,50 @@ export class UserController {
 
     return {
       privateKey: user.privateKey,
+    };
+  }
+
+  @Post('transaction')
+  async transaction(
+    @Body('senderPrivateKey') senderPrivateKey: string,
+    @Body('senderPublicKey') senderPublicKey: string,
+    @Body('senderPassword') senderPassword: string,
+    @Body('receiverPublicKey') receiverPublicKey: string,
+    @Body('amount') amount: number,
+  ): Promise<any> {
+    const sender = await this.userService.findByPublicKey(senderPublicKey);
+    if (!sender) {
+      throw new UnauthorizedException('Sender not found');
+    } else if (sender.password !== senderPassword) {
+      throw new UnauthorizedException('Sender password do not match');
+    }
+
+    const ec = new elliptic.ec('secp256k1');
+    const keyPair = ec.keyFromPrivate(senderPrivateKey);
+    const calculatedPublicKey = keyPair.getPublic('hex');
+    if (senderPublicKey !== calculatedPublicKey) {
+      throw new UnauthorizedException('Invalid private key for the sender');
+    }
+
+    if (sender.balance < amount) {
+      throw new Error('Insufficient balance');
+    }
+
+    sender.balance -= amount;
+    await this.userService.update(sender);
+
+    const receiver = await this.userService.findByPublicKey(receiverPublicKey);
+    if (!receiver) {
+      throw new Error('Receiver not found');
+    }
+
+    receiver.balance += amount;
+    await this.userService.update(receiver);
+
+    return {
+      message: 'Transaction successful',
+      senderBalance: sender.balance,
+      receiverBalance: receiver.balance, //shoraite hobe
     };
   }
 }

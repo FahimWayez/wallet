@@ -14,6 +14,7 @@ export class UserService {
       publicKey: newUser.publicKey,
       privateKey: newUser.privateKey,
       password: newUser.password,
+      balance: 1000,
     };
 
     this.users.push(user);
@@ -27,6 +28,10 @@ export class UserService {
   async update(user: User): Promise<void> {
     await db.put(user.id.toString(), user);
   }
+
+  async findByPublicKey(publicKey: string): Promise<User | undefined> {
+    return this.users.find((user) => user.publicKey === publicKey);
+  }
 }
 
 interface User {
@@ -35,6 +40,7 @@ interface User {
   publicKey: string;
   privateKey: string;
   password: string;
+  balance: number;
 }
 
 interface CreateUserDto {
