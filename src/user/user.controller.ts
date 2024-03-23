@@ -10,7 +10,7 @@ import * as bip39 from 'bip39';
 import * as crypto from 'crypto';
 import * as elliptic from 'elliptic';
 import { UserService, Transaction } from './user.service';
-
+const ec = new elliptic.ec('secp256k1');
 @Controller('users')
 export class UserController {
   constructor(private readonly userService: UserService) {}
@@ -140,5 +140,17 @@ export class UserController {
       receiverBalance: receiver.balance, //shoraite hobe
       transaction, //ekhane ja ja lagbe ta ta dekhay dis
     };
+  }
+
+  async validateSignature(transaction): Promise<boolean> {
+    try {
+      let key = ec.keyFromPublic(transaction.from, 'hex');
+      return key.verify(
+        transaction.transactionHash,
+        transaction.digitalSignature,
+      );
+    } catch (error) {
+      return false;
+    }
   }
 }
