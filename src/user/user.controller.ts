@@ -7,8 +7,9 @@ import {
   Req,
 } from '@nestjs/common';
 import * as bip39 from 'bip39';
+import * as crypto from 'crypto';
 import * as elliptic from 'elliptic';
-import { UserService } from './user.service';
+import { UserService, Transaction } from './user.service';
 
 @Controller('users')
 export class UserController {
@@ -105,6 +106,31 @@ export class UserController {
       throw new Error('Receiver not found');
     }
 
+    const transactionAction = `Transfer ${amount} DCL amount to ${receiverPublicKey}`;
+    const timestamp = Date.now();
+    const transactionHash = crypto
+      .createHash('sha256')
+      .update(
+        `${transactionAction}${senderPublicKey}${receiverPublicKey}${amount}${timestamp}`,
+      )
+      .digest('hex');
+
+    const digitalSignature = keyPair.sign(transactionHash).toDER('hex');
+
+    const transaction: Transaction = {
+      status: 'pending',
+      block: -1,
+      timestamp,
+      transactionAction,
+      from: senderPublicKey,
+      to: receiverPublicKey,
+      amount,
+      transactionFee: 0,
+      gasPrice: 0,
+      transactionHash,
+      digitalSignature,
+    };
+
     receiver.balance += amount;
     await this.userService.update(receiver);
 
@@ -112,6 +138,7 @@ export class UserController {
       message: 'Transaction successful',
       senderBalance: sender.balance,
       receiverBalance: receiver.balance, //shoraite hobe
+      transaction, //ekhane ja ja lagbe ta ta dekhay dis
     };
   }
 }

@@ -26,7 +26,7 @@ export class UserService {
   }
 
   async update(user: User): Promise<void> {
-    await db.put(user.id.toString(), user);
+    await db.put(user.id.toString(), user.publicKey, user.password);
   }
 
   async findByPublicKey(publicKey: string): Promise<User | undefined> {
@@ -48,4 +48,18 @@ interface CreateUserDto {
   publicKey: string;
   privateKey: string;
   password: string;
+}
+
+export interface Transaction {
+  status: 'success' | 'pending' | 'rejected';
+  block: number;
+  timestamp: number;
+  transactionAction: string;
+  from: string;
+  to: string;
+  amount: number;
+  transactionFee: number;
+  gasPrice: number;
+  transactionHash: string;
+  digitalSignature: string;
 }
