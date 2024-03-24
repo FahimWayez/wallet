@@ -10,10 +10,12 @@ import * as bip39 from 'bip39';
 import * as crypto from 'crypto';
 import * as elliptic from 'elliptic';
 import { UserService, Transaction } from './user.service';
-const ec = new elliptic.ec('secp256k1');
+import axios from 'axios'; // Import axios directly
+
 @Controller('users')
 export class UserController {
   constructor(private readonly userService: UserService) {}
+
   @Post('register')
   async register(@Body('password') password: string): Promise<any> {
     const mnemonic = bip39.generateMnemonic();
@@ -32,8 +34,8 @@ export class UserController {
     return {
       mnemonic,
       publicKey: user.publicKey,
-      password: user.password, //shoraite hobe
-      privateKey: user.privateKey, //shoraite hobe
+      password: user.password,
+      privateKey: user.privateKey,
     };
   }
 
@@ -53,8 +55,8 @@ export class UserController {
 
     return {
       publicKey: user.publicKey,
-      privateKey: user.privateKey, //shoraite hobe
-      password: user.password, //shoraite hobe
+      privateKey: user.privateKey,
+      password: user.password,
     };
   }
 
@@ -78,78 +80,101 @@ export class UserController {
     @Body('senderPublicKey') senderPublicKey: string,
     @Body('senderPassword') senderPassword: string,
     @Body('receiverPublicKey') receiverPublicKey: string,
-    @Body('amount') amount: number,
+    @Body('value') value: number,
   ): Promise<any> {
-    const sender = await this.userService.findByPublicKey(senderPublicKey);
-    if (!sender) {
-      throw new UnauthorizedException('Sender not found');
-    } else if (sender.password !== senderPassword) {
-      throw new UnauthorizedException('Sender password do not match');
+    try {
+      const sender = await this.userService.findByPublicKey(senderPublicKey);
+      if (!sender) {
+        throw new UnauthorizedException('Sender not found');
+      } else if (sender.password !== senderPassword) {
+        throw new UnauthorizedException('Sender password do not match');
+      }
+
+      const ec = new elliptic.ec('secp256k1');
+      const keyPair = ec.keyFromPrivate(senderPrivateKey);
+      const calculatedPublicKey = keyPair.getPublic('hex');
+      if (senderPublicKey !== calculatedPublicKey) {
+        throw new UnauthorizedException('Invalid private key for the sender');
+      }
+
+      if (sender.balance < value) {
+        throw new Error('Insufficient balance');
+      }
+
+      const receiver =
+        await this.userService.findByPublicKey(receiverPublicKey);
+      if (!receiver) {
+        throw new Error('Receiver not found');
+      }
+
+      const transactionAction = `Transfer ${value} DCL value to ${receiverPublicKey}`;
+      const timestamp = Date.now();
+      const transactionHash = crypto
+        .createHash('sha256')
+        .update(
+          `${transactionAction}${senderPublicKey}${receiverPublicKey}${value}${timestamp}`,
+        )
+        .digest('hex');
+
+      const signature = keyPair.sign(transactionHash).toDER('hex');
+
+      const transaction: Transaction = {
+        status: 'pending',
+        block: -1,
+        timestamp,
+        transactionAction,
+        from: senderPublicKey,
+        to: receiverPublicKey,
+        value,
+        transactionFee: 0,
+        gasPrice: 0,
+        transactionHash,
+        signature,
+      };
+
+      await this.postTransaction(transaction);
+
+      sender.balance -= value;
+      await this.userService.update(sender);
+
+      receiver.balance += value;
+      await this.userService.update(receiver);
+
+      return {
+        message: 'Transaction successful',
+        senderBalance: sender.balance,
+        receiverBalance: receiver.balance,
+        transaction,
+      };
+    } catch (error) {
+      console.error('Transaction failed:', error);
+      throw error;
     }
+  }
 
-    const ec = new elliptic.ec('secp256k1');
-    const keyPair = ec.keyFromPrivate(senderPrivateKey);
-    const calculatedPublicKey = keyPair.getPublic('hex');
-    if (senderPublicKey !== calculatedPublicKey) {
-      throw new UnauthorizedException('Invalid private key for the sender');
+  async postTransaction(transaction): Promise<void> {
+    try {
+      const response = await axios.post(
+        'http://192.168.0.142:3000/transaction',
+        transaction,
+      );
+      console.log('Transaction broadcasted:', response.data);
+
+      const isSignatureValid = await this.validateSignature(transaction);
+      console.log('Signature is valid:', isSignatureValid);
+    } catch (error) {
+      console.error('Failed to broadcast transaction:', error);
+      throw new Error('Failed to broadcast transaction');
     }
-
-    if (sender.balance < amount) {
-      throw new Error('Insufficient balance');
-    }
-
-    sender.balance -= amount;
-    await this.userService.update(sender);
-
-    const receiver = await this.userService.findByPublicKey(receiverPublicKey);
-    if (!receiver) {
-      throw new Error('Receiver not found');
-    }
-
-    const transactionAction = `Transfer ${amount} DCL amount to ${receiverPublicKey}`;
-    const timestamp = Date.now();
-    const transactionHash = crypto
-      .createHash('sha256')
-      .update(
-        `${transactionAction}${senderPublicKey}${receiverPublicKey}${amount}${timestamp}`,
-      )
-      .digest('hex');
-
-    const digitalSignature = keyPair.sign(transactionHash).toDER('hex');
-
-    const transaction: Transaction = {
-      status: 'pending',
-      block: -1,
-      timestamp,
-      transactionAction,
-      from: senderPublicKey,
-      to: receiverPublicKey,
-      amount,
-      transactionFee: 0,
-      gasPrice: 0,
-      transactionHash,
-      digitalSignature,
-    };
-
-    receiver.balance += amount;
-    await this.userService.update(receiver);
-
-    return {
-      message: 'Transaction successful',
-      senderBalance: sender.balance,
-      receiverBalance: receiver.balance, //shoraite hobe
-      transaction, //ekhane ja ja lagbe ta ta dekhay dis
-    };
   }
 
   async validateSignature(transaction): Promise<boolean> {
     try {
+      const ec = new elliptic.ec('secp256k1'); // Instantiate elliptic.ec
       let key = ec.keyFromPublic(transaction.from, 'hex');
-      return key.verify(
-        transaction.transactionHash,
-        transaction.digitalSignature,
-      );
+      return key.verify(transaction.transactionHash, transaction.signature);
     } catch (error) {
+      console.error('Failed to validate signature:', error);
       return false;
     }
   }

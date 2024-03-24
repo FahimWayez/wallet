@@ -57,9 +57,9 @@ export interface Transaction {
   transactionAction: string;
   from: string;
   to: string;
-  amount: number;
+  value: number;
   transactionFee: number;
   gasPrice: number;
   transactionHash: string;
-  digitalSignature: string;
+  signature: string;
 }
